@@ -6,9 +6,8 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="外科手术并发症风险预测", layout="wide")
 st.title("🩺 外科手术后严重并发症风险预测系统")
-st.markdown("**600例真实临床数据 · CatBoost 模型 + SHAP 可解释性分析**")
+st.markdown("**600例真实临床数据 · CatBoost + SHAP 可解释性**")
 
-# ==================== 加载模型 ====================
 @st.cache_resource
 def load_model():
     with open("catboost_model.pkl", "rb") as f:
@@ -16,7 +15,6 @@ def load_model():
 
 model = load_model()
 
-# ==================== 侧边栏输入 ====================
 st.sidebar.header("📋 患者信息")
 age = st.sidebar.slider("年龄 (岁)", 18, 85, 55)
 sex = st.sidebar.selectbox("性别", [0, 1])
@@ -33,7 +31,6 @@ open_surgery = st.sidebar.checkbox("开放手术")
 iss_like_score = st.sidebar.slider("ISS-like 评分", 1, 33, 11)
 
 if st.sidebar.button("🚀 预测并发症风险"):
-    # 构建输入 + 高级特征（和之前完全一致）
     input_df = pd.DataFrame({
         'age': [age], 'sex': [sex], 'bmi': [bmi], 'asa_score': [asa_score],
         'surgery_duration_min': [surgery_duration_min], 'diabetes': [int(diabetes)],
@@ -43,6 +40,7 @@ if st.sidebar.button("🚀 预测并发症风险"):
         'iss_like_score': [iss_like_score]
     })
     
+    # 高级特征
     input_df['Inflammation_Nutrition_Ratio'] = input_df['preop_crp'] / (input_df['preop_albumin'] + 1e-6)
     input_df['Hypoalbuminemia'] = (input_df['preop_albumin'] < 3.5).astype(int)
     input_df['HyperCRP'] = (input_df['preop_crp'] > 50).astype(int)
@@ -57,38 +55,43 @@ if st.sidebar.button("🚀 预测并发症风险"):
                                                  0.20 * input_df['Age_Comorbidity_Index'] +
                                                  0.15 * input_df['Metabolic_Risk_Score'])
 
-    # 预测
     prob = model.predict_proba(input_df)[0][1]
     st.success(f"**并发症发生概率：{prob:.1%}**")
 
-    # ==================== SHAP 计算 + 所有图 ====================
+    # ==================== 所有实验图 ====================
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_df)
 
-    # 包装成 Explanation 对象（关键修复）
-    exp = shap.Explanation(values=shap_values, 
-                           data=input_df.values,
-                           feature_names=input_df.columns.tolist())
-
-    # 图1: SHAP 重要性柱状图（已正常）
+    # 图1: SHAP 重要性柱状图
     st.subheader("🔍 图1: SHAP 特征重要性柱状图")
-    fig1, ax1 = plt.subplots(figsize=(10, 6))
-    shap.plots.bar(exp, show=False)
+    fig1 = plt.figure(figsize=(10, 6))
+    shap.plots.bar(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), show=False)
     plt.tight_layout()
-    st.pyplot(fig1)
+    st.pyplot(fig1, use_container_width=True)
+    plt.close(fig1)
 
-    # 图2-4: 依赖图（已修复空白问题）
-    for feat, title in [("asa_score", "ASA 分级依赖图"),
-                        ("emergency", "急诊手术依赖图"),
-                        ("surgery_duration_min", "手术时长依赖图")]:
-        st.subheader(f"🔍 {title}")
-        fig, ax = plt.subplots(figsize=(8, 5))
-        try:
-            shap.dependence_plot(feat, shap_values, input_df, 
-                                 interaction_index=None, show=False)
-            plt.tight_layout()
-            st.pyplot(fig, clear_figure=True)
-        except:
-            st.write(f"（{title} 暂时无法渲染，但重要性已在图1显示）")
+    # 图2: ASA 分级散点依赖图（稳定版）
+    st.subheader("🔍 图2: ASA 分级依赖图")
+    fig2 = plt.figure(figsize=(8, 5))
+    shap.plots.scatter(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), color="asa_score", show=False)
+    plt.tight_layout()
+    st.pyplot(fig2, use_container_width=True)
+    plt.close(fig2)
 
-    st.caption("红色 = 增加风险 | 蓝色 = 降低风险 | 以上就是你所有核心实验图")
+    # 图3: 急诊手术依赖图
+    st.subheader("🔍 图3: 急诊手术依赖图")
+    fig3 = plt.figure(figsize=(8, 5))
+    shap.plots.scatter(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), color="emergency", show=False)
+    plt.tight_layout()
+    st.pyplot(fig3, use_container_width=True)
+    plt.close(fig3)
+
+    # 图4: 手术时长依赖图
+    st.subheader("🔍 图4: 手术时长依赖图")
+    fig4 = plt.figure(figsize=(8, 5))
+    shap.plots.scatter(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), color="surgery_duration_min", show=False)
+    plt.tight_layout()
+    st.pyplot(fig4, use_container_width=True)
+    plt.close(fig4)
+
+    st.caption("✅ 以上就是你要求的**所有实验图**（SHAP柱状图 + 3个依赖图）。红色点表示高风险趋势。")
