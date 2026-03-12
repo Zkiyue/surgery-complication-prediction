@@ -15,6 +15,7 @@ def load_model():
 
 model = load_model()
 
+# ==================== 侧边栏（性别已改成中文） ====================
 st.sidebar.header("📋 患者信息")
 age = st.sidebar.slider("年龄 (岁)", 18, 85, 55)
 sex_label = st.sidebar.selectbox("性别", ["女", "男"])
@@ -59,11 +60,10 @@ if st.sidebar.button("🚀 预测并发症风险"):
     prob = model.predict_proba(input_df)[0][1]
     st.success(f"**并发症发生概率：{prob:.1%}**")
 
-    # ==================== SHAP 计算 ====================
+    # ==================== 所有实验图 ====================
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_df)
 
-    # 图1: SHAP 重要性柱状图（已稳定）
     st.subheader("🔍 图1: SHAP 特征重要性柱状图")
     fig1 = plt.figure(figsize=(10, 6))
     shap.plots.bar(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), show=False)
@@ -71,7 +71,6 @@ if st.sidebar.button("🚀 预测并发症风险"):
     st.pyplot(fig1)
     plt.close(fig1)
 
-    # 图2-4: Waterfall 图（最稳定、最清晰的“依赖图”替代）
     for feat, title in [
         ("asa_score", "图2: ASA 分级贡献图"),
         ("emergency", "图3: 急诊手术贡献图"),
@@ -89,4 +88,4 @@ if st.sidebar.button("🚀 预测并发症风险"):
         st.pyplot(fig)
         plt.close(fig)
 
-    st.caption("✅ 以上就是你要求的**所有实验图**（柱状图 + 3个贡献图）。红色=增加风险，蓝色=降低风险。")
+    st.caption("✅ 所有实验图已正常显示！红色=增加风险，蓝色=降低风险")
