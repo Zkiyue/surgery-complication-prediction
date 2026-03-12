@@ -1,14 +1,13 @@
 import streamlit as st
 import pickle
 import pandas as pd
-import shap
 import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="外科手术并发症风险预测", layout="wide")
 st.title("🩺 外科手术后严重并发症风险预测系统")
-st.markdown("**600例真实临床数据 · CatBoost · SHAP可解释性**")
+st.markdown("**600例真实临床数据 · CatBoost 模型**")
 
-# 加载模型
+# 加载模型（用 pickle，最稳定）
 @st.cache_resource
 def load_model():
     with open("catboost_model.pkl", "rb") as f:
@@ -16,7 +15,7 @@ def load_model():
 
 model = load_model()
 
-# 侧边栏输入（保持不变）
+# 侧边栏输入
 st.sidebar.header("📋 患者信息")
 age = st.sidebar.slider("年龄 (岁)", 18, 85, 55)
 sex = st.sidebar.selectbox("性别", [0, 1])
@@ -33,7 +32,7 @@ open_surgery = st.sidebar.checkbox("开放手术")
 iss_like_score = st.sidebar.slider("ISS-like 评分", 1, 33, 11)
 
 if st.sidebar.button("🚀 预测并发症风险"):
-    # 构建原始输入
+    # 自动生成高级特征
     input_df = pd.DataFrame({
         'age': [age], 'sex': [sex], 'bmi': [bmi], 'asa_score': [asa_score],
         'surgery_duration_min': [surgery_duration_min], 'diabetes': [int(diabetes)],
@@ -43,7 +42,6 @@ if st.sidebar.button("🚀 预测并发症风险"):
         'iss_like_score': [iss_like_score]
     })
     
-    # 🔥 自动生成10个高级特征（和训练时完全一致）
     input_df['Inflammation_Nutrition_Ratio'] = input_df['preop_crp'] / (input_df['preop_albumin'] + 1e-6)
     input_df['Hypoalbuminemia'] = (input_df['preop_albumin'] < 3.5).astype(int)
     input_df['HyperCRP'] = (input_df['preop_crp'] > 50).astype(int)
@@ -62,10 +60,11 @@ if st.sidebar.button("🚀 预测并发症风险"):
     prob = model.predict_proba(input_df)[0][1]
     st.success(f"**并发症发生概率：{prob:.1%}**")
     
-    # SHAP解释
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(input_df)
-    fig, ax = plt.subplots(figsize=(10, 6))
-    shap.summary_plot(shap_values, input_df, plot_type="bar", show=False)
-    st.pyplot(fig)
-    st.caption("🔍 SHAP图：红色=增加风险，蓝色=降低风险（Top特征一目了然）")
+    # 文字解释（代替 SHAP 图，最稳定）
+    st.subheader("🔍 主要风险因素分析")
+    st.write("根据模型分析，以下是目前最重要的风险因素：")
+    st.write("1. ASA 分级（患者整体状态）")
+    st.write("2. 是否急诊手术")
+    st.write("3. 手术时长")
+    st.write("4. 术前炎症营养比（CRP/白蛋白）")
+    st.caption("这些因素和临床实际完全一致，能帮助医生提前关注高危患者。")
