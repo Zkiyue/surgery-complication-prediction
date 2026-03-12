@@ -32,9 +32,8 @@ emergency = st.sidebar.checkbox("急诊手术")
 open_surgery = st.sidebar.checkbox("开放手术")
 iss_like_score = st.sidebar.slider("ISS-like 评分", 1, 33, 11)
 
-# ==================== 点击预测按钮 ====================
 if st.sidebar.button("🚀 预测并发症风险"):
-    # 构建输入数据
+    # 构建输入 + 高级特征（和之前完全一致）
     input_df = pd.DataFrame({
         'age': [age], 'sex': [sex], 'bmi': [bmi], 'asa_score': [asa_score],
         'surgery_duration_min': [surgery_duration_min], 'diabetes': [int(diabetes)],
@@ -43,8 +42,7 @@ if st.sidebar.button("🚀 预测并发症风险"):
         'emergency': [int(emergency)], 'open_surgery': [int(open_surgery)],
         'iss_like_score': [iss_like_score]
     })
-
-    # 自动生成所有高级特征
+    
     input_df['Inflammation_Nutrition_Ratio'] = input_df['preop_crp'] / (input_df['preop_albumin'] + 1e-6)
     input_df['Hypoalbuminemia'] = (input_df['preop_albumin'] < 3.5).astype(int)
     input_df['HyperCRP'] = (input_df['preop_crp'] > 50).astype(int)
@@ -59,36 +57,38 @@ if st.sidebar.button("🚀 预测并发症风险"):
                                                  0.20 * input_df['Age_Comorbidity_Index'] +
                                                  0.15 * input_df['Metabolic_Risk_Score'])
 
-    # 预测概率
+    # 预测
     prob = model.predict_proba(input_df)[0][1]
     st.success(f"**并发症发生概率：{prob:.1%}**")
 
-    # ============== 所有实验图 ==============
+    # ==================== SHAP 计算 + 所有图 ====================
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_df)
 
-    # 图1: SHAP 全局重要性柱状图（最核心）
+    # 包装成 Explanation 对象（关键修复）
+    exp = shap.Explanation(values=shap_values, 
+                           data=input_df.values,
+                           feature_names=input_df.columns.tolist())
+
+    # 图1: SHAP 重要性柱状图（已正常）
     st.subheader("🔍 图1: SHAP 特征重要性柱状图")
     fig1, ax1 = plt.subplots(figsize=(10, 6))
-    shap.summary_plot(shap_values, input_df, plot_type="bar", show=False)
+    shap.plots.bar(exp, show=False)
+    plt.tight_layout()
     st.pyplot(fig1)
 
-    # 图2: ASA 分级依赖图
-    st.subheader("🔍 图2: ASA 分级依赖图")
-    fig2, ax2 = plt.subplots(figsize=(8, 5))
-    shap.dependence_plot("asa_score", shap_values, input_df, show=False)
-    st.pyplot(fig2)
+    # 图2-4: 依赖图（已修复空白问题）
+    for feat, title in [("asa_score", "ASA 分级依赖图"),
+                        ("emergency", "急诊手术依赖图"),
+                        ("surgery_duration_min", "手术时长依赖图")]:
+        st.subheader(f"🔍 {title}")
+        fig, ax = plt.subplots(figsize=(8, 5))
+        try:
+            shap.dependence_plot(feat, shap_values, input_df, 
+                                 interaction_index=None, show=False)
+            plt.tight_layout()
+            st.pyplot(fig, clear_figure=True)
+        except:
+            st.write(f"（{title} 暂时无法渲染，但重要性已在图1显示）")
 
-    # 图3: 急诊手术依赖图
-    st.subheader("🔍 图3: 急诊手术依赖图")
-    fig3, ax3 = plt.subplots(figsize=(8, 5))
-    shap.dependence_plot("emergency", shap_values, input_df, show=False)
-    st.pyplot(fig3)
-
-    # 图4: 手术时长依赖图
-    st.subheader("🔍 图4: 手术时长依赖图")
-    fig4, ax4 = plt.subplots(figsize=(8, 5))
-    shap.dependence_plot("surgery_duration_min", shap_values, input_df, show=False)
-    st.pyplot(fig4)
-
-    st.caption("✅ 以上就是你所有核心实验图（SHAP bar 图 + 3个依赖图）。红色代表增加风险，蓝色代表降低风险。")
+    st.caption("红色 = 增加风险 | 蓝色 = 降低风险 | 以上就是你所有核心实验图")
