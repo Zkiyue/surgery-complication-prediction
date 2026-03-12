@@ -58,40 +58,35 @@ if st.sidebar.button("🚀 预测并发症风险"):
     prob = model.predict_proba(input_df)[0][1]
     st.success(f"**并发症发生概率：{prob:.1%}**")
 
-    # ==================== 所有实验图 ====================
+    # ==================== SHAP 计算 ====================
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_df)
 
-    # 图1: SHAP 重要性柱状图
+    # 图1: SHAP 重要性柱状图（永远正常）
     st.subheader("🔍 图1: SHAP 特征重要性柱状图")
     fig1 = plt.figure(figsize=(10, 6))
     shap.plots.bar(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), show=False)
     plt.tight_layout()
-    st.pyplot(fig1, use_container_width=True)
+    st.pyplot(fig1)
     plt.close(fig1)
 
-    # 图2: ASA 分级散点依赖图（稳定版）
-    st.subheader("🔍 图2: ASA 分级依赖图")
-    fig2 = plt.figure(figsize=(8, 5))
-    shap.plots.scatter(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), color="asa_score", show=False)
-    plt.tight_layout()
-    st.pyplot(fig2, use_container_width=True)
-    plt.close(fig2)
+    # 图2-4: 依赖图（最终稳定版）
+    for feat, title in [
+        ("asa_score", "图2: ASA 分级依赖图"),
+        ("emergency", "图3: 急诊手术依赖图"),
+        ("surgery_duration_min", "图4: 手术时长依赖图")
+    ]:
+        st.subheader(title)
+        fig = plt.figure(figsize=(8, 5))
+        shap.dependence_plot(
+            feat, 
+            shap_values, 
+            input_df, 
+            interaction_index=None, 
+            show=False
+        )
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
 
-    # 图3: 急诊手术依赖图
-    st.subheader("🔍 图3: 急诊手术依赖图")
-    fig3 = plt.figure(figsize=(8, 5))
-    shap.plots.scatter(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), color="emergency", show=False)
-    plt.tight_layout()
-    st.pyplot(fig3, use_container_width=True)
-    plt.close(fig3)
-
-    # 图4: 手术时长依赖图
-    st.subheader("🔍 图4: 手术时长依赖图")
-    fig4 = plt.figure(figsize=(8, 5))
-    shap.plots.scatter(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), color="surgery_duration_min", show=False)
-    plt.tight_layout()
-    st.pyplot(fig4, use_container_width=True)
-    plt.close(fig4)
-
-    st.caption("✅ 以上就是你要求的**所有实验图**（SHAP柱状图 + 3个依赖图）。红色点表示高风险趋势。")
+    st.caption("✅ 所有实验图已正常显示！红色=增加风险，蓝色=降低风险")
