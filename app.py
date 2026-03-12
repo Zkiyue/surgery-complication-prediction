@@ -17,7 +17,8 @@ model = load_model()
 
 st.sidebar.header("📋 患者信息")
 age = st.sidebar.slider("年龄 (岁)", 18, 85, 55)
-sex = st.sidebar.selectbox("性别", [0, 1])
+sex_label = st.sidebar.selectbox("性别", ["女", "男"])
+sex = 0 if sex_label == "女" else 1
 bmi = st.sidebar.slider("BMI", 16.0, 42.0, 27.0)
 asa_score = st.sidebar.slider("ASA 分级", 1, 4, 2)
 surgery_duration_min = st.sidebar.slider("手术时长 (分钟)", 20, 300, 80)
