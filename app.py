@@ -1,5 +1,5 @@
 import streamlit as st
-import joblib
+import pickle
 import pandas as pd
 import shap
 import matplotlib.pyplot as plt
@@ -11,14 +11,15 @@ st.markdown("**600例真实临床数据 · CatBoost · SHAP可解释性**")
 # 加载模型
 @st.cache_resource
 def load_model():
-    return joblib.load("catboost_model.pkl")
+    with open("catboost_model.pkl", "rb") as f:
+        return pickle.load(f)
 
 model = load_model()
 
-# 侧边栏输入（只输入原始临床数据）
+# 侧边栏输入（保持不变）
 st.sidebar.header("📋 患者信息")
 age = st.sidebar.slider("年龄 (岁)", 18, 85, 55)
-sex = st.sidebar.selectbox("性别", [0, 1])  # 0=女 1=男
+sex = st.sidebar.selectbox("性别", [0, 1])
 bmi = st.sidebar.slider("BMI", 16.0, 42.0, 27.0)
 asa_score = st.sidebar.slider("ASA 分级", 1, 4, 2)
 surgery_duration_min = st.sidebar.slider("手术时长 (分钟)", 20, 300, 80)
