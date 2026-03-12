@@ -1,12 +1,14 @@
 import streamlit as st
 import pickle
 import pandas as pd
+import shap
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="外科手术并发症风险预测", layout="wide")
 st.title("🩺 外科手术后严重并发症风险预测系统")
-st.markdown("**600例真实临床数据 · CatBoost 模型**")
+st.markdown("**600例真实临床数据 · CatBoost 模型 + SHAP 可解释性分析**")
 
-# 加载模型（最稳定方式）
+# ==================== 加载模型 ====================
 @st.cache_resource
 def load_model():
     with open("catboost_model.pkl", "rb") as f:
@@ -14,7 +16,7 @@ def load_model():
 
 model = load_model()
 
-# 侧边栏输入
+# ==================== 侧边栏输入 ====================
 st.sidebar.header("📋 患者信息")
 age = st.sidebar.slider("年龄 (岁)", 18, 85, 55)
 sex = st.sidebar.selectbox("性别", [0, 1])
@@ -30,8 +32,9 @@ emergency = st.sidebar.checkbox("急诊手术")
 open_surgery = st.sidebar.checkbox("开放手术")
 iss_like_score = st.sidebar.slider("ISS-like 评分", 1, 33, 11)
 
+# ==================== 点击预测按钮 ====================
 if st.sidebar.button("🚀 预测并发症风险"):
-    # 构建输入
+    # 构建输入数据
     input_df = pd.DataFrame({
         'age': [age], 'sex': [sex], 'bmi': [bmi], 'asa_score': [asa_score],
         'surgery_duration_min': [surgery_duration_min], 'diabetes': [int(diabetes)],
@@ -40,8 +43,8 @@ if st.sidebar.button("🚀 预测并发症风险"):
         'emergency': [int(emergency)], 'open_surgery': [int(open_surgery)],
         'iss_like_score': [iss_like_score]
     })
-    
-    # 自动生成高级特征
+
+    # 自动生成所有高级特征
     input_df['Inflammation_Nutrition_Ratio'] = input_df['preop_crp'] / (input_df['preop_albumin'] + 1e-6)
     input_df['Hypoalbuminemia'] = (input_df['preop_albumin'] < 3.5).astype(int)
     input_df['HyperCRP'] = (input_df['preop_crp'] > 50).astype(int)
@@ -55,15 +58,37 @@ if st.sidebar.button("🚀 预测并发症风险"):
                                                  0.30 * input_df['Surgery_Risk_Score'] +
                                                  0.20 * input_df['Age_Comorbidity_Index'] +
                                                  0.15 * input_df['Metabolic_Risk_Score'])
-    
-    # 预测
+
+    # 预测概率
     prob = model.predict_proba(input_df)[0][1]
     st.success(f"**并发症发生概率：{prob:.1%}**")
-    
-    # 文字解释（代替图片）
-    st.subheader("🔍 主要风险因素")
-    st.write("1. ASA 分级（患者整体状态）")
-    st.write("2. 是否急诊手术")
-    st.write("3. 手术时长")
-    st.write("4. 术前炎症营养比（CRP/白蛋白）")
-    st.caption("这些因素和临床实际完全一致，能帮助医生提前关注高危患者。")
+
+    # ============== 所有实验图 ==============
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(input_df)
+
+    # 图1: SHAP 全局重要性柱状图（最核心）
+    st.subheader("🔍 图1: SHAP 特征重要性柱状图")
+    fig1, ax1 = plt.subplots(figsize=(10, 6))
+    shap.summary_plot(shap_values, input_df, plot_type="bar", show=False)
+    st.pyplot(fig1)
+
+    # 图2: ASA 分级依赖图
+    st.subheader("🔍 图2: ASA 分级依赖图")
+    fig2, ax2 = plt.subplots(figsize=(8, 5))
+    shap.dependence_plot("asa_score", shap_values, input_df, show=False)
+    st.pyplot(fig2)
+
+    # 图3: 急诊手术依赖图
+    st.subheader("🔍 图3: 急诊手术依赖图")
+    fig3, ax3 = plt.subplots(figsize=(8, 5))
+    shap.dependence_plot("emergency", shap_values, input_df, show=False)
+    st.pyplot(fig3)
+
+    # 图4: 手术时长依赖图
+    st.subheader("🔍 图4: 手术时长依赖图")
+    fig4, ax4 = plt.subplots(figsize=(8, 5))
+    shap.dependence_plot("surgery_duration_min", shap_values, input_df, show=False)
+    st.pyplot(fig4)
+
+    st.caption("✅ 以上就是你所有核心实验图（SHAP bar 图 + 3个依赖图）。红色代表增加风险，蓝色代表降低风险。")
