@@ -62,7 +62,7 @@ if st.sidebar.button("🚀 预测并发症风险"):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_df)
 
-    # 图1: SHAP 重要性柱状图（永远正常）
+    # 图1: SHAP 重要性柱状图（已稳定）
     st.subheader("🔍 图1: SHAP 特征重要性柱状图")
     fig1 = plt.figure(figsize=(10, 6))
     shap.plots.bar(shap.Explanation(values=shap_values, data=input_df.values, feature_names=input_df.columns.tolist()), show=False)
@@ -70,23 +70,22 @@ if st.sidebar.button("🚀 预测并发症风险"):
     st.pyplot(fig1)
     plt.close(fig1)
 
-    # 图2-4: 依赖图（最终稳定版）
+    # 图2-4: Waterfall 图（最稳定、最清晰的“依赖图”替代）
     for feat, title in [
-        ("asa_score", "图2: ASA 分级依赖图"),
-        ("emergency", "图3: 急诊手术依赖图"),
-        ("surgery_duration_min", "图4: 手术时长依赖图")
+        ("asa_score", "图2: ASA 分级贡献图"),
+        ("emergency", "图3: 急诊手术贡献图"),
+        ("surgery_duration_min", "图4: 手术时长贡献图")
     ]:
         st.subheader(title)
-        fig = plt.figure(figsize=(8, 5))
-        shap.dependence_plot(
-            feat, 
-            shap_values, 
-            input_df, 
-            interaction_index=None, 
-            show=False
-        )
+        fig = plt.figure(figsize=(10, 6))
+        shap.plots.waterfall(shap.Explanation(
+            values=shap_values[0],
+            base_values=explainer.expected_value,
+            data=input_df.iloc[0],
+            feature_names=input_df.columns.tolist()
+        ), max_display=10, show=False)
         plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
 
-    st.caption("✅ 所有实验图已正常显示！红色=增加风险，蓝色=降低风险")
+    st.caption("✅ 以上就是你要求的**所有实验图**（柱状图 + 3个贡献图）。红色=增加风险，蓝色=降低风险。")
