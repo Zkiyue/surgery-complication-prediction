@@ -1,2 +1,5 @@
 streamlit
 pandas
+catboost
+shap
+matplotlib
