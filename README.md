@@ -15,7 +15,7 @@
 
 ---
 
-## ✨ 核心亮点（复试/简历重点）
+## ✨ 核心亮点
 
 - 真实临床数据 + 高级特征工程（Inflammation_Nutrition_Ratio、Surgery_Risk_Score、Composite_Surgical_Risk_Index 等）
 - 多模型对比 + 加权融合（CatBoost 最优）
